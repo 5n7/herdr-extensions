@@ -1,5 +1,5 @@
 {
-  description = "Herdr plugins, built with Nix";
+  description = "Herdr plugins and Herdr app mods, built with Nix";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
@@ -26,10 +26,11 @@
         let
           scope = lib.makeScope nixpkgs.legacyPackages.${system}.newScope (self: {
             buildBunExecutable = self.callPackage ./nix/build-bun-executable.nix { };
+            buildMod = self.callPackage ./nix/build-mod.nix { };
             buildPlugin = self.callPackage ./nix/build-plugin.nix { };
           });
         in
-        discover "plugin" scope.callPackage ./plugins
+        discover "mod" scope.callPackage ./mods // discover "plugin" scope.callPackage ./plugins
       );
 
       checks = self.packages;
