@@ -118,7 +118,6 @@ export function unixTransport(
         let settled = false;
         let sock: { end: () => void } | undefined;
         const decoder = new TextDecoder();
-        const encoder = new TextEncoder();
         const requestFrame = frame.endsWith("\n") ? frame : `${frame}\n`;
         const timer = setTimeout(() => finish(new Error("transport")), timeoutMs);
 
@@ -148,24 +147,15 @@ export function unixTransport(
               socket.write(requestFrame);
             },
             data(_socket, data) {
-              const newline = typeof data === "string" ? data.indexOf("\n") : data.indexOf(0x0a);
-              const frameData = newline === -1 ? data : data.slice(0, newline);
-              bufferBytes +=
-                (typeof frameData === "string"
-                  ? encoder.encode(frameData).byteLength
-                  : frameData.byteLength) + (newline === -1 ? 0 : 1);
+              const newline = data.indexOf(0x0a);
+              const frameData = newline === -1 ? data : data.subarray(0, newline);
+              bufferBytes += frameData.byteLength + (newline === -1 ? 0 : 1);
               if (bufferBytes > maxResponseBytes) {
                 finish(new Error("transport"));
                 return;
               }
-              buffer +=
-                typeof frameData === "string"
-                  ? frameData
-                  : decoder.decode(frameData, { stream: newline === -1 });
+              buffer += decoder.decode(frameData, { stream: newline === -1 });
               if (newline !== -1) {
-                if (typeof frameData !== "string") {
-                  buffer += decoder.decode();
-                }
                 finish(null, buffer);
               }
             },
