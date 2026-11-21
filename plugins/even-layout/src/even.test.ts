@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { memoryFs } from "../../../packages/herdr-runtime/src/memory-fs";
-import { type PaneTabsDeps, readPaneTab } from "../../../packages/herdr-runtime/src/pane-tabs";
-import type { HerdrRpc, JsonRpcResponse } from "../../../packages/herdr-runtime/src/rpc";
+import { memoryFs } from "../../../runtime/memory-fs";
+import { type PaneTabsDeps, readPaneTab } from "../../../runtime/pane-tabs";
+import type { HerdrRpc, JsonRpcResponse } from "../../../runtime/rpc";
 import { createEvenInvocation, evenTab } from "./even";
 
 function rpc(script: Array<(method: string, params: unknown) => JsonRpcResponse>): HerdrRpc {

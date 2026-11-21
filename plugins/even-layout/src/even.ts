@@ -1,5 +1,5 @@
-import { type PaneTabsDeps, seedLivePaneTabs } from "../../../packages/herdr-runtime/src/pane-tabs";
-import { interpretResponse } from "../../../packages/herdr-runtime/src/rpc";
+import { type PaneTabsDeps, seedLivePaneTabs } from "../../../runtime/pane-tabs";
+import { interpretResponse } from "../../../runtime/rpc";
 import { interpretExport, type PendingSplit } from "./layout";
 
 const MAX_EXPORT_FAILURES = 3;

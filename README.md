@@ -22,8 +22,8 @@ bun run check
 ## Layout
 
 ```text
-packages/herdr-runtime/   shared JSON-RPC, pane notes, coalescing, plugin host
-plugins/<plugin-id>/      herdr-plugin.toml, ./plugin, TypeScript sources
+runtime/                 shared JSON-RPC, pane notes, coalescing, plugin host
+plugins/<name>/           herdr-plugin.toml, ./plugin, TypeScript sources
 ```
 
 `./plugin` in a plugin directory is the Herdr command. A source checkout runs it with Bun.
@@ -31,18 +31,18 @@ plugins/<plugin-id>/      herdr-plugin.toml, ./plugin, TypeScript sources
 ## Link a local source tree
 
 ```sh
-herdr plugin link ./plugins/herdr-even-layout --enabled
+herdr plugin link ./plugins/even-layout --enabled
 ```
 
 ## Build outputs
 
-- `bun run build` writes `dist/<plugin-id>/plugin.js` for every plugin.
-- `bun run build:standalone` writes `dist/<plugin-id>/plugin` for every plugin on the current host.
+- `bun run build` writes `dist/<name>/plugin.js` for every plugin.
+- `bun run build:standalone` writes `dist/<name>/plugin` for every plugin on the current host.
 
 ## Add a plugin
 
-1. Create `plugins/<plugin-id>/` with `herdr-plugin.toml`, a `./plugin` launcher, and `src/main.ts`. Copy `./plugin` from an existing plugin.
-2. Start `src/main.ts` with `createPluginLog`, `requiredEnv`, `createHost`, and `runPlugin` from `packages/herdr-runtime`. Use the runtime for socket RPC, pane notes, and coalescing. Keep event routing and plugin behavior in the plugin.
+1. Create `plugins/<name>/` with `herdr-plugin.toml`, a `./plugin` launcher, and `src/main.ts`. Copy `./plugin` from an existing plugin.
+2. Start `src/main.ts` with `createPluginLog`, `requiredEnv`, `createHost`, and `runPlugin` from `runtime/`. Use the runtime for socket RPC, pane notes, and coalescing. Keep event routing and plugin behavior in the plugin.
 3. Build, signing, smoke tests, shfmt, and ShellCheck discover `plugins/*/herdr-plugin.toml`. Do not add the plugin id to `package.json`.
 4. Keep unit tests next to the modules they cover.
 

@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": []
   },
-  "include": ["packages/**/*.ts", "plugins/**/*.ts", "types/**/*.ts"]
+  "include": ["runtime/**/*.ts", "plugins/**/*.ts", "types/**/*.ts"]
 }

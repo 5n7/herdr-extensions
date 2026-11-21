@@ -1,4 +1,4 @@
-import { interpretResponse, type JsonRpcResponse } from "../../../packages/herdr-runtime/src/rpc";
+import { interpretResponse, type JsonRpcResponse } from "../../../runtime/rpc";
 
 export type LayoutDirection = "right" | "down";
 

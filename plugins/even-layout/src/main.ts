@@ -1,11 +1,6 @@
-import { coalesceTabWork } from "../../../packages/herdr-runtime/src/coalesce";
-import {
-  createHost,
-  createPluginLog,
-  requiredEnv,
-  runPlugin,
-} from "../../../packages/herdr-runtime/src/host";
-import { pluginEventFromEnv, resolveTabs } from "../../../packages/herdr-runtime/src/pane-tabs";
+import { coalesceTabWork } from "../../../runtime/coalesce";
+import { createHost, createPluginLog, requiredEnv, runPlugin } from "../../../runtime/host";
+import { pluginEventFromEnv, resolveTabs } from "../../../runtime/pane-tabs";
 import { createEvenInvocation } from "./even";
 
 const pluginLog = createPluginLog("herdr-even-layout");
