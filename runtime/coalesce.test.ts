@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { acquireTabLock, type CoalesceDeps, coalesceTabWork } from "./coalesce";
 import { memoryFs } from "./memory-fs";
 import type { Clock, ProcessTable } from "./process";
+import { errno } from "./testing";
 
 function instantClock(): Clock {
   return { sleep: async () => undefined };
@@ -25,10 +26,6 @@ function deps(pid: number, live: Set<number>, fs = memoryFs()): CoalesceDeps {
     socketKey: "sock",
     stateDir: "/state",
   };
-}
-
-function errno(code: string): Error & { code: string } {
-  return Object.assign(new Error(code), { code });
 }
 
 describe("acquireTabLock", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { draw, STYLE } from "./draw";
 import type { Piece, Screen } from "./layout";
-import type { Phase } from "./phase";
+import { typing } from "./phase";
 
 const one = (row: number, column: number, text: string) => ({
   token: { line: row, start: column, text },
@@ -13,8 +13,6 @@ const screen = (
   tokens: Screen["tokens"],
   hints: Record<string, string>,
 ): Screen => ({ rows, tokens, hints: new Map(Object.entries(hints)) });
-
-const typing = (typed = ""): Phase => ({ kind: "typing", typed });
 
 const at = (row: number, column: number) => `\x1b[${row};${column}H`;
 

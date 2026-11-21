@@ -3,6 +3,10 @@ export type Phase =
   | { kind: "picked"; text: string }
   | { kind: "empty"; note: string };
 
+export function typing(typed = ""): Phase {
+  return { kind: "typing", typed };
+}
+
 const ESC = "\x1b";
 const CTRL_C = "\x03";
 const BACKSPACE = new Set(["\x7f", "\b"]);
@@ -27,10 +31,10 @@ export function press(
 }
 
 function type(hints: ReadonlyMap<string, string>, typed: string, key: string): Phase {
-  if (BACKSPACE.has(key)) return { kind: "typing", typed: typed.slice(0, -1) };
-  if (!/^[a-z]$/i.test(key)) return { kind: "typing", typed };
+  if (BACKSPACE.has(key)) return typing(typed.slice(0, -1));
+  if (!/^[a-z]$/i.test(key)) return typing(typed);
   const next = typed + key.toLowerCase();
   for (const [text, hint] of hints) if (hint === next) return { kind: "picked", text };
   const started = [...hints.values()].some((hint) => hint.startsWith(next));
-  return { kind: "typing", typed: started ? next : "" };
+  return typing(started ? next : "");
 }

@@ -1,13 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { type Phase, press } from "./phase";
+import { press, typing } from "./phase";
 
 const hints = new Map([
   ["/tmp/a", "a"],
   ["/tmp/b", "ma"],
   ["/tmp/c", "ms"],
 ]);
-
-const typing = (typed = ""): Phase => ({ kind: "typing", typed });
 
 describe("press", () => {
   test("picks the text whose hint a letter completes, in either case", () => {

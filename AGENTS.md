@@ -20,6 +20,7 @@ bun install --frozen-lockfile
 
 - `plugins/<name>/` holds `herdr-plugin.toml`, `src/main.ts` and a `default.nix` of `buildPlugin ./.`. `flake.nix` finds it and exposes `plugin-<name>`.
 - Plugins talk to Herdr through `runtime/`.
+- Test doubles shared across plugins' and runtime's tests live in `runtime/testing.ts`.
 - Keep layout math and event routing free of sockets and the filesystem, so tests stay deterministic.
 - `herdr-plugin.toml` is the source of a plugin's id and version. Bump `version` there.
 

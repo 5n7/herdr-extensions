@@ -1,46 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { memoryFs } from "./memory-fs";
 import {
   notePaneTab,
-  type PaneTabsDeps,
   type PluginEvent,
   pluginEventFromEnv,
   readPaneTab,
   resolveTabs,
   seedLivePaneTabs,
 } from "./pane-tabs";
-import type { HerdrRpc, JsonRpcResponse } from "./rpc";
-
-function rpc(handlers: Record<string, (params: unknown) => JsonRpcResponse>): HerdrRpc {
-  return {
-    call(method, params) {
-      const handler = handlers[method];
-      if (!handler) {
-        return Promise.resolve({ error: { code: "unknown_method" } });
-      }
-      return Promise.resolve(handler(params));
-    },
-  };
-}
-
-function deps(partial?: Partial<PaneTabsDeps> & { rpc?: HerdrRpc }): {
-  deps: PaneTabsDeps;
-  logs: string[];
-} {
-  const logs: string[] = [];
-  return {
-    logs,
-    deps: {
-      fs: memoryFs(),
-      rpc: rpc({}),
-      stateDir: "/state",
-      socketKey: "abc",
-      log: (message) => logs.push(message),
-      pid: 42,
-      ...partial,
-    },
-  };
-}
+import { paneTabsDeps, routedRpc } from "./testing";
 
 function event(partial: Partial<PluginEvent>): PluginEvent {
   return {
@@ -55,8 +22,8 @@ function event(partial: Partial<PluginEvent>): PluginEvent {
 
 describe("seedLivePaneTabs", () => {
   test("creates the note directory once and writes independent notes concurrently", async () => {
-    const { deps: d } = deps({
-      rpc: rpc({
+    const { deps: d } = paneTabsDeps({
+      rpc: routedRpc({
         "pane.list": () => ({
           result: {
             type: "pane_list",
@@ -92,8 +59,8 @@ describe("seedLivePaneTabs", () => {
   });
 
   test("fails when pane.list is not a pane_list", async () => {
-    const { deps: d } = deps({
-      rpc: rpc({
+    const { deps: d } = paneTabsDeps({
+      rpc: routedRpc({
         "pane.list": () => ({ error: { code: "boom" } }),
       }),
     });
@@ -101,8 +68,8 @@ describe("seedLivePaneTabs", () => {
   });
 
   test("rejects a pane_list whose panes field is not an array", async () => {
-    const { deps: d } = deps({
-      rpc: rpc({
+    const { deps: d } = paneTabsDeps({
+      rpc: routedRpc({
         "pane.list": () => ({ result: { type: "pane_list", panes: null } }),
       }),
     });
@@ -117,8 +84,8 @@ describe("seedLivePaneTabs", () => {
       { pane_id: "p1", tab_id: null },
     ];
     for (const entry of invalidEntries) {
-      const { deps: d } = deps({
-        rpc: rpc({
+      const { deps: d } = paneTabsDeps({
+        rpc: routedRpc({
           "pane.list": () => ({ result: { type: "pane_list", panes: [entry] } }),
         }),
       });
@@ -153,8 +120,8 @@ describe("pluginEventFromEnv", () => {
 
 describe("resolveTabs", () => {
   test("resolves startup to unique tab IDs in stable order and writes final pane notes", async () => {
-    const { deps: d } = deps({
-      rpc: rpc({
+    const { deps: d } = paneTabsDeps({
+      rpc: routedRpc({
         "pane.list": () => ({
           result: {
             type: "pane_list",
@@ -181,7 +148,7 @@ describe("resolveTabs", () => {
   });
 
   test("uses the supplied tab for an action", async () => {
-    const { deps: d } = deps();
+    const { deps: d } = paneTabsDeps();
     expect(await resolveTabs(d, event({ tabId: "t1" }))).toEqual({
       tabIds: ["t1"],
       skipped: false,
@@ -189,8 +156,8 @@ describe("resolveTabs", () => {
   });
 
   test("uses the active workspace tab when an action has no tab", async () => {
-    const { deps: d } = deps({
-      rpc: rpc({
+    const { deps: d } = paneTabsDeps({
+      rpc: routedRpc({
         "workspace.get": () => ({ result: { workspace: { active_tab_id: "active" } } }),
       }),
     });
@@ -201,15 +168,15 @@ describe("resolveTabs", () => {
   });
 
   test("skips an unsupported event instead of treating it as an action", async () => {
-    const { deps: d, logs } = deps();
+    const { deps: d, logs } = paneTabsDeps();
     const result = await resolveTabs(d, event({ event: "pane.updated", tabId: "t1" }));
     expect(result).toEqual({ tabIds: [], skipped: true });
     expect(logs).toEqual(["unsupported plugin event pane.updated; skipping"]);
   });
 
   test("skips pane.closed when no note exists and does not use the workspace tab", async () => {
-    const { deps: d, logs } = deps({
-      rpc: rpc({
+    const { deps: d, logs } = paneTabsDeps({
+      rpc: routedRpc({
         "workspace.get": () => ({ result: { workspace: { active_tab_id: "active" } } }),
       }),
     });
@@ -222,7 +189,7 @@ describe("resolveTabs", () => {
   });
 
   test("closes against the noted tab and removes the note", async () => {
-    const { deps: d } = deps();
+    const { deps: d } = paneTabsDeps();
     await notePaneTab(d, "p1", "t1");
     const result = await resolveTabs(
       d,
@@ -234,8 +201,8 @@ describe("resolveTabs", () => {
 
   test("writes the destination note before removing the source pane on move", async () => {
     const order: string[] = [];
-    const { deps: d } = deps({
-      rpc: rpc({
+    const { deps: d } = paneTabsDeps({
+      rpc: routedRpc({
         "pane.get": () => ({ result: { pane: { tab_id: "dest" } } }),
       }),
     });
@@ -279,8 +246,8 @@ describe("resolveTabs", () => {
   });
 
   test("keeps a same-id move note instead of deleting it", async () => {
-    const { deps: d } = deps({
-      rpc: rpc({
+    const { deps: d } = paneTabsDeps({
+      rpc: routedRpc({
         "pane.get": () => ({ result: { pane: { tab_id: "dest" } } }),
       }),
     });

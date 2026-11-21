@@ -16,7 +16,7 @@ Extensions for [Herdr](https://herdr.dev), packaged as a Nix flake:
 ```text
 flake.nix                 packages.<system>.*, found from plugins/ and mods/
 nix/                      buildPlugin, buildMod, buildBunExecutable
-runtime/                  TypeScript shared by plugins: JSON-RPC, pane notes, coalescing
+runtime/                  TypeScript shared by plugins: JSON-RPC, pane notes, coalescing, test doubles
 plugins/<name>/           herdr-plugin.toml, src/, default.nix
 mods/<name>/              main.js, mod.json, default.nix, and src/ for a helper program
 mods/shared/              modules copied into every mod

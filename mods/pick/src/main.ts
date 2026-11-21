@@ -1,6 +1,6 @@
 import { draw, ENTER, LEAVE } from "./draw";
 import { layOut, type Screen } from "./layout";
-import { type Phase, press } from "./phase";
+import { type Phase, press, typing } from "./phase";
 import { findTokens, findUrls, type Token } from "./tokens";
 
 const PICKED_MS = 150;
@@ -32,7 +32,7 @@ const MODES: Record<string, Mode> = {
 class Picker {
   private readonly tokens: Token[];
   private screen!: Screen;
-  private phase: Phase = { kind: "typing", typed: "" };
+  private phase: Phase = typing();
   private note?: ReturnType<typeof setTimeout>;
 
   constructor(
@@ -67,10 +67,7 @@ class Picker {
   private fit(): void {
     this.screen = layOut(this.lines, this.tokens, process.stdout.columns, process.stdout.rows);
     if (this.phase.kind === "picked") return;
-    this.phase =
-      this.screen.hints.size > 0
-        ? { kind: "typing", typed: "" }
-        : { kind: "empty", note: this.mode.nothing };
+    this.phase = this.screen.hints.size > 0 ? typing() : { kind: "empty", note: this.mode.nothing };
   }
 
   private render(): void {

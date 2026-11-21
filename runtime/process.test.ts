@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { hostProcess } from "./process";
-
-function errno(code: string): Error & { code: string } {
-  return Object.assign(new Error(code), { code });
-}
+import { errno } from "./testing";
 
 describe("hostProcess", () => {
   test("treats EPERM as evidence that the process exists", () => {
