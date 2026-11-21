@@ -62,6 +62,18 @@ describe("draw", () => {
     });
     expect(out).toContain(`${at(5, 1)}\x1b[2K${STYLE.note} no URL `);
   });
+
+  test("says on the bottom row why taking the pick failed, without hints", () => {
+    const out = draw({
+      screen: screen(["see https://a.test"], [one(0, 4, "https://a.test")], {
+        "https://a.test": "a",
+      }),
+      phase: { kind: "failed", note: "open exited with 1" },
+      height: 5,
+    });
+    expect(out).toContain(`${at(5, 1)}\x1b[2K${STYLE.note} open exited with 1 `);
+    expect(out).not.toContain(STYLE.hint);
+  });
 });
 
 function one(row: number, column: number, text: string): Screen["tokens"][number] {

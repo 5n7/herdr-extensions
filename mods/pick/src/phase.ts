@@ -8,7 +8,8 @@ const SEQUENCE = /\x1b(?:\[[0-?]*[ -/]*[@-~]|O.)/g;
 export type Phase =
   | { kind: "typing"; typed: string }
   | { kind: "picked"; text: string }
-  | { kind: "empty"; note: string };
+  | { kind: "empty"; note: string }
+  | { kind: "failed"; note: string };
 
 export function typing(typed = ""): Phase {
   return { kind: "typing", typed };

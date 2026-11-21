@@ -32,8 +32,7 @@ export function draw({ screen, phase, height }: Picture): string {
     const hint = screen.hints.get(token.text);
     if (hint?.startsWith(phase.typed)) out.push(...hintOver(pieces, hint, phase.typed.length));
   }
-  if (phase.kind === "empty")
-    out.push(at(height - 1, 0), `${CSI}2K`, STYLE.note, ` ${phase.note} `);
+  if ("note" in phase) out.push(at(height - 1, 0), `${CSI}2K`, STYLE.note, ` ${phase.note} `);
   out.push(`${CSI}0m`);
   return out.join("");
 }
