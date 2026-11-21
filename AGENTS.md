@@ -16,11 +16,20 @@ bun install --frozen-lockfile
 - For a mod, copy `nix build .#mod-<name>` to a scratch folder, make the copy writable, and run `herdr-app check` on it. Never call a mod done without a passing check.
 - New files must be added to Git before Nix can see them.
 
+## Code style
+
+The same rules hold for TypeScript and for mods' JavaScript.
+
+- Order a file top-down: imports, constants, types, then exports in the order a reader meets them, then the internal helpers they call. A helper used by one function goes right below it.
+- Declare types with `type`, not `interface`.
+- Declare top-level functions with `function`. Arrow functions are for callbacks and object members.
+- Tests sit beside the module they cover. A test file has one `describe` per export it tests, named after the export. Test names say what happens, as in `test("recovers a lock whose owner is dead")`.
+- Test doubles shared across plugins' and runtime's tests live in `runtime/testing.ts`. A mod's helper program builds from its own `src/` alone, so its shared test code stays there. A helper used by one test file stays in that file.
+
 ## Plugins
 
 - `plugins/<name>/` holds `herdr-plugin.toml`, `src/main.ts` and a `default.nix` of `buildPlugin ./.`. `flake.nix` finds it and exposes `plugin-<name>`.
 - Plugins talk to Herdr through `runtime/`.
-- Test doubles shared across plugins' and runtime's tests live in `runtime/testing.ts`.
 - Keep layout math and event routing free of sockets and the filesystem, so tests stay deterministic.
 - `herdr-plugin.toml` is the source of a plugin's id and version. Bump `version` there.
 

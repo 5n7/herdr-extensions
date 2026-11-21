@@ -9,17 +9,6 @@ import {
 } from "./pane-tabs";
 import { paneTabsDeps, routedRpc } from "./testing";
 
-function event(partial: Partial<PluginEvent>): PluginEvent {
-  return {
-    event: "",
-    eventJson: {},
-    paneId: "",
-    tabId: "",
-    workspaceId: "",
-    ...partial,
-  };
-}
-
 describe("seedLivePaneTabs", () => {
   test("creates the note directory once and writes independent notes concurrently", async () => {
     const { deps: d } = paneTabsDeps({
@@ -263,3 +252,14 @@ describe("resolveTabs", () => {
     expect(await readPaneTab(d, "p1")).toBe("dest");
   });
 });
+
+function event(partial: Partial<PluginEvent>): PluginEvent {
+  return {
+    event: "",
+    eventJson: {},
+    paneId: "",
+    tabId: "",
+    workspaceId: "",
+    ...partial,
+  };
+}

@@ -2,9 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { layOut } from "./layout";
 import type { Token } from "./tokens";
 
-const pieces = (screen: ReturnType<typeof layOut>) =>
-  screen.tokens.flatMap(({ pieces }) => pieces.map(({ row, column, text }) => [row, column, text]));
-
 describe("layOut", () => {
   test("wraps a line at the width, its tokens with it", () => {
     const token: Token = { line: 0, start: 4, text: "https://a.test/abc" };
@@ -43,3 +40,9 @@ describe("layOut", () => {
     ]);
   });
 });
+
+function pieces(screen: ReturnType<typeof layOut>): (number | string)[][] {
+  return screen.tokens.flatMap(({ pieces }) =>
+    pieces.map(({ row, column, text }) => [row, column, text]),
+  );
+}

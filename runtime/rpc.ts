@@ -1,3 +1,6 @@
+export const RPC_MAX_RESPONSE_BYTES = 1024 * 1024;
+export const RPC_TIMEOUT_MS = 5000;
+
 export type JsonRpcRequest = {
   id: string;
   method: string;
@@ -29,60 +32,16 @@ export type HerdrRpc = {
   call: (method: string, params?: unknown) => Promise<JsonRpcResponse>;
 };
 
-export const RPC_MAX_RESPONSE_BYTES = 1024 * 1024;
-export const RPC_TIMEOUT_MS = 5000;
-
-export class RpcError extends Error {
-  readonly code: string;
-
-  constructor(code: string, label: string) {
-    super(`${label} failed: ${code}`);
-    this.code = code;
-    this.name = "RpcError";
-  }
-}
-
-export function encodeRequest(id: string, method: string, params: unknown = {}): string {
-  const body: JsonRpcRequest = { id, method, params: params ?? {} };
-  return `${JSON.stringify(body)}\n`;
-}
-
-export function parseResponse(raw: string): JsonRpcResponse {
-  const text = raw.replace(/^\uFEFF/, "").trim();
-  const parsed: unknown = JSON.parse(text);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("transport");
-  }
-  return parsed as JsonRpcResponse;
-}
-
-export function interpretResponse<T>(
-  response: JsonRpcResponse,
-  read: (response: JsonRpcResponse) => T | undefined | null,
-  missingCode?: string,
-): RpcOutcome<T> {
-  if (missingCode && response.error?.code === missingCode) {
-    return { kind: "missing", code: missingCode };
-  }
-  try {
-    const value = read(response);
-    if (value !== undefined && value !== null) {
-      return { kind: "ok", value };
-    }
-  } catch {
-    return { kind: "fail", code: "transport" };
-  }
-  return { kind: "fail", code: response.error?.code ?? "transport" };
-}
-
-export function requireField<T>(outcome: RpcOutcome<T>, label: string): T | null {
-  if (outcome.kind === "missing") {
-    return null;
-  }
-  if (outcome.kind === "ok") {
-    return outcome.value;
-  }
-  throw new RpcError(outcome.code, label);
+export function createHerdrRpc(opts: {
+  transport: LineTransport;
+  id: string;
+  timeoutMs?: number;
+}): HerdrRpc {
+  return {
+    call(method, params = {}) {
+      return call(opts.transport, opts.id, method, params, opts.timeoutMs ?? RPC_TIMEOUT_MS);
+    },
+  };
 }
 
 export async function call(
@@ -104,6 +63,20 @@ export async function call(
   } catch {
     return { error: { code: "transport" } };
   }
+}
+
+export function encodeRequest(id: string, method: string, params: unknown = {}): string {
+  const body: JsonRpcRequest = { id, method, params: params ?? {} };
+  return `${JSON.stringify(body)}\n`;
+}
+
+export function parseResponse(raw: string): JsonRpcResponse {
+  const text = raw.replace(/^\uFEFF/, "").trim();
+  const parsed: unknown = JSON.parse(text);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("transport");
+  }
+  return parsed as JsonRpcResponse;
 }
 
 export function unixTransport(
@@ -182,14 +155,41 @@ export function unixTransport(
   };
 }
 
-export function createHerdrRpc(opts: {
-  transport: LineTransport;
-  id: string;
-  timeoutMs?: number;
-}): HerdrRpc {
-  return {
-    call(method, params = {}) {
-      return call(opts.transport, opts.id, method, params, opts.timeoutMs ?? RPC_TIMEOUT_MS);
-    },
-  };
+export function interpretResponse<T>(
+  response: JsonRpcResponse,
+  read: (response: JsonRpcResponse) => T | undefined | null,
+  missingCode?: string,
+): RpcOutcome<T> {
+  if (missingCode && response.error?.code === missingCode) {
+    return { kind: "missing", code: missingCode };
+  }
+  try {
+    const value = read(response);
+    if (value !== undefined && value !== null) {
+      return { kind: "ok", value };
+    }
+  } catch {
+    return { kind: "fail", code: "transport" };
+  }
+  return { kind: "fail", code: response.error?.code ?? "transport" };
+}
+
+export function requireField<T>(outcome: RpcOutcome<T>, label: string): T | null {
+  if (outcome.kind === "missing") {
+    return null;
+  }
+  if (outcome.kind === "ok") {
+    return outcome.value;
+  }
+  throw new RpcError(outcome.code, label);
+}
+
+export class RpcError extends Error {
+  readonly code: string;
+
+  constructor(code: string, label: string) {
+    super(`${label} failed: ${code}`);
+    this.code = code;
+    this.name = "RpcError";
+  }
 }

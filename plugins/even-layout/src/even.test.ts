@@ -4,22 +4,6 @@ import type { HerdrRpc, JsonRpcResponse } from "../../../runtime/rpc";
 import { paneTabsDeps, routedRpc } from "../../../runtime/testing";
 import { createEvenInvocation, evenTab } from "./even";
 
-function scriptedRpc(
-  script: Array<(method: string, params: unknown) => JsonRpcResponse>,
-): HerdrRpc {
-  let i = 0;
-  return {
-    call(method, params) {
-      const step = script[i];
-      i += 1;
-      if (!step) {
-        return Promise.resolve({ error: { code: "unexpected" } });
-      }
-      return Promise.resolve(step(method, params));
-    },
-  };
-}
-
 const tree = {
   type: "split",
   direction: "right",
@@ -52,7 +36,9 @@ describe("evenTab", () => {
     await evenTab(d, "tab");
     expect(await readPaneTab(d, "p1")).toBe("t1");
   });
+});
 
+describe("createEvenInvocation", () => {
   test("equalizes a seeded invocation without listing panes", async () => {
     const methods: string[] = [];
     const { deps: d } = paneTabsDeps({
@@ -136,3 +122,19 @@ describe("evenTab", () => {
     expect(paneListCalls).toBe(2);
   });
 });
+
+function scriptedRpc(
+  script: Array<(method: string, params: unknown) => JsonRpcResponse>,
+): HerdrRpc {
+  let i = 0;
+  return {
+    call(method, params) {
+      const step = script[i];
+      i += 1;
+      if (!step) {
+        return Promise.resolve({ error: { code: "unexpected" } });
+      }
+      return Promise.resolve(step(method, params));
+    },
+  };
+}

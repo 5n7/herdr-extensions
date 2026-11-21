@@ -1,17 +1,3 @@
-export interface Token {
-  line: number;
-  start: number;
-  text: string;
-}
-
-interface Kind {
-  // With a `token` group, only the group is taken.
-  re: RegExp;
-  trim?: boolean;
-}
-
-type Candidate = Token & { reach: number };
-
 const LINE_COLUMN = String.raw`(?::\d+(?::\d+)?)`;
 const OCTET = String.raw`(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)`;
 const PATH_CHAR = String.raw`[\w.\-@+%~]`;
@@ -46,6 +32,23 @@ const KINDS = [COMMIT, DIFF_PATH, IPV4, NUMBER, PATH, URL, UUID];
 
 const OPENABLE = /^https?:\/\//i;
 
+const OPENING: Record<string, string> = { ")": "(", "]": "[" };
+const DOT_SEGMENT = /(?:^|\/)\.\.$/;
+
+export type Token = {
+  line: number;
+  start: number;
+  text: string;
+};
+
+type Kind = {
+  // With a `token` group, only the group is taken.
+  re: RegExp;
+  trim?: boolean;
+};
+
+type Candidate = Token & { reach: number };
+
 export function findTokens(lines: readonly string[]): Token[] {
   return resolveOverlaps(candidates(lines, KINDS));
 }
@@ -67,9 +70,6 @@ function matches(text: string, line: number, kind: Kind): Candidate[] {
   });
 }
 
-const OPENING: Record<string, string> = { ")": "(", "]": "[" };
-const DOT_SEGMENT = /(?:^|\/)\.\.$/;
-
 function trimSentenceEnd(text: string): string {
   for (;;) {
     text = text.replace(/\.{3,}$/, "");
@@ -82,7 +82,9 @@ function trimSentenceEnd(text: string): string {
   }
 }
 
-const count = (text: string, char: string) => text.split(char).length - 1;
+function count(text: string, char: string): number {
+  return text.split(char).length - 1;
+}
 
 // Of two overlapping matches the longer wins, then the earlier on screen. So a
 // URL beats the path inside it, and a diff path, whose match counts the +++ b/
@@ -98,6 +100,10 @@ function resolveOverlaps(candidates: Candidate[]): Token[] {
   return kept.map(({ reach: _, ...token }) => token).sort(byPosition);
 }
 
-const endOf = (t: Token) => t.start + t.text.length;
+function endOf(t: Token): number {
+  return t.start + t.text.length;
+}
 
-const byPosition = (a: Token, b: Token) => a.line - b.line || a.start - b.start;
+function byPosition(a: Token, b: Token): number {
+  return a.line - b.line || a.start - b.start;
+}

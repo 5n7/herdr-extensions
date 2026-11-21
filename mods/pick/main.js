@@ -60,12 +60,14 @@ async function showPicker(mode, cx) {
   run("terminal.show", { terminal: picker, pane: f.pane });
 }
 
-const listed = (address) => terminals().some((x) => x.address === address);
-
 async function until(cx, done, failure) {
   const deadline = Date.now() + LISTING_TIMEOUT_MS;
   while (!done()) {
     if (Date.now() > deadline) throw new Error(failure);
     await cx.sleep(LISTING_POLL_MS);
   }
+}
+
+function listed(address) {
+  return terminals().some((x) => x.address === address);
 }

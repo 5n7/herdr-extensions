@@ -83,7 +83,10 @@ describe("interpretResponse", () => {
       code: "boom",
     });
   });
-  test("uses transport when the payload is not an object", () => {
+});
+
+describe("parseResponse", () => {
+  test("throws when the payload is not an object", () => {
     expect(parseResponse.bind(null, "[]")).toThrow();
   });
 });

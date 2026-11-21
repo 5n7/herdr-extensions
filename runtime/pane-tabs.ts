@@ -37,163 +37,23 @@ export type ResolveTabsResult = {
   skipped: boolean;
 };
 
-function classifyPluginEvent(event: string): PluginEventKind {
-  switch (event) {
-    case "":
-      return "action";
-    case "pane.created":
-    case "pane.moved":
-    case "pane.closed":
-    case "startup":
-      return event;
-    default:
-      return "unknown";
-  }
-}
-
-function eventData(eventJson: unknown): Record<string, unknown> {
-  if (typeof eventJson !== "object" || eventJson === null || !("data" in eventJson)) {
-    return {};
-  }
-  const data = (eventJson as { data?: unknown }).data;
-  if (typeof data !== "object" || data === null) {
-    return {};
-  }
-  return data as Record<string, unknown>;
-}
-
-function paneNoteDir(deps: PaneTabsDeps): string {
-  return `${deps.stateDir}/panes/${deps.socketKey}`;
-}
-
-function paneNotePath(deps: PaneTabsDeps, paneId: string): string {
-  return `${paneNoteDir(deps)}/${hexKey(paneId)}`;
-}
-
-async function writePaneNote(deps: PaneTabsDeps, paneId: string, tabId: string): Promise<void> {
-  const notePath = paneNotePath(deps, paneId);
-  const temporary = `${notePath}.${deps.pid}`;
-  await deps.fs.writeFile(temporary, tabId);
-  await deps.fs.rename(temporary, notePath);
-}
-
-export async function notePaneTab(
-  deps: PaneTabsDeps,
-  paneId: string,
-  tabId: string,
-): Promise<void> {
-  if (!paneId || !tabId) {
-    return;
-  }
-  await deps.fs.mkdirp(paneNoteDir(deps));
-  await writePaneNote(deps, paneId, tabId);
-}
-
-export async function readPaneTab(deps: PaneTabsDeps, paneId: string): Promise<string | null> {
-  return deps.fs.readFile(paneNotePath(deps, paneId));
-}
-
-export async function removePaneNote(deps: PaneTabsDeps, paneId: string): Promise<void> {
-  await deps.fs.rm(paneNotePath(deps, paneId));
-}
-
-function stringField(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-export async function paneTab(deps: PaneTabsDeps, paneId: string): Promise<string | null> {
-  const response = await deps.rpc.call("pane.get", { pane_id: paneId });
-  const outcome = interpretResponse(
-    response,
-    (rpc) => {
-      const pane = (rpc.result as { pane?: { tab_id?: unknown } } | undefined)?.pane;
-      const tabId = pane?.tab_id;
-      return typeof tabId === "string" && tabId ? tabId : undefined;
-    },
-    "pane_not_found",
-  );
-  return requireField(outcome, `pane.get ${paneId}`);
-}
-
-export async function workspaceActiveTab(
-  deps: PaneTabsDeps,
-  workspaceId: string,
-): Promise<string | null> {
-  const response = await deps.rpc.call("workspace.get", { workspace_id: workspaceId });
-  const outcome = interpretResponse(
-    response,
-    (rpc) => {
-      const tabId = (rpc.result as { workspace?: { active_tab_id?: unknown } } | undefined)
-        ?.workspace?.active_tab_id;
-      return typeof tabId === "string" && tabId ? tabId : undefined;
-    },
-    "workspace_not_found",
-  );
-  return requireField(outcome, "workspace.get");
-}
-
-function paneListEntries(response: JsonRpcResponse): PaneListEntry[] | null {
-  const type = (response.result as { type?: unknown } | undefined)?.type;
-  if (type !== "pane_list") {
-    return null;
-  }
-  const panes = (response.result as { panes?: unknown }).panes;
-  if (!Array.isArray(panes)) {
-    return null;
-  }
-  const entries: PaneListEntry[] = [];
-  for (const pane of panes) {
-    if (typeof pane !== "object" || pane === null || Array.isArray(pane)) {
-      return null;
+export function pluginEventFromEnv(env: Record<string, string | undefined>): PluginEvent {
+  const event = env.HERDR_PLUGIN_EVENT ?? "";
+  let eventJson: unknown;
+  if (env.HERDR_PLUGIN_EVENT_JSON) {
+    try {
+      eventJson = JSON.parse(env.HERDR_PLUGIN_EVENT_JSON);
+    } catch {
+      eventJson = {};
     }
-    const { pane_id: paneId, tab_id: tabId } = pane as Record<string, unknown>;
-    if (typeof paneId !== "string" || typeof tabId !== "string") {
-      return null;
-    }
-    entries.push({ pane_id: paneId, tab_id: tabId });
   }
-  return entries;
-}
-
-export async function seedLivePaneTabs(deps: PaneTabsDeps): Promise<string[]> {
-  const response = await deps.rpc.call("pane.list", {});
-  const typeOutcome = interpretResponse(
-    response,
-    (rpc) => (rpc.result as { type?: unknown } | undefined)?.type,
-  );
-  if (typeOutcome.kind !== "ok" || typeOutcome.value !== "pane_list") {
-    const code = typeOutcome.kind === "fail" ? typeOutcome.code : "transport";
-    throw new Error(`pane.list failed: ${code}`);
-  }
-  const panes = paneListEntries(response);
-  if (panes === null) {
-    throw new Error("pane.list returned invalid pane data");
-  }
-  const notes = new Map<string, string>();
-  const tabIds = new Set<string>();
-  for (const { pane_id: paneId, tab_id: tabId } of panes) {
-    if (!paneId || !tabId) {
-      continue;
-    }
-    notes.set(paneId, tabId);
-    tabIds.add(tabId);
-  }
-  if (notes.size === 0) {
-    return [];
-  }
-  await deps.fs.mkdirp(paneNoteDir(deps));
-  await Promise.all([...notes].map(([paneId, tabId]) => writePaneNote(deps, paneId, tabId)));
-  return [...tabIds];
-}
-
-function addTab(tabs: string[], tabId: string): string[] {
-  if (!tabId) {
-    return tabs;
-  }
-  if (tabs.includes(tabId)) {
-    return tabs;
-  }
-  return [...tabs, tabId];
+  return {
+    event,
+    eventJson,
+    paneId: env.HERDR_PANE_ID ?? "",
+    tabId: env.HERDR_TAB_ID ?? "",
+    workspaceId: env.HERDR_WORKSPACE_ID ?? "",
+  };
 }
 
 export async function resolveTabs(
@@ -253,21 +113,161 @@ export async function resolveTabs(
   return { tabIds, skipped: false };
 }
 
-export function pluginEventFromEnv(env: Record<string, string | undefined>): PluginEvent {
-  const event = env.HERDR_PLUGIN_EVENT ?? "";
-  let eventJson: unknown;
-  if (env.HERDR_PLUGIN_EVENT_JSON) {
-    try {
-      eventJson = JSON.parse(env.HERDR_PLUGIN_EVENT_JSON);
-    } catch {
-      eventJson = {};
-    }
+function classifyPluginEvent(event: string): PluginEventKind {
+  switch (event) {
+    case "":
+      return "action";
+    case "pane.created":
+    case "pane.moved":
+    case "pane.closed":
+    case "startup":
+      return event;
+    default:
+      return "unknown";
   }
-  return {
-    event,
-    eventJson,
-    paneId: env.HERDR_PANE_ID ?? "",
-    tabId: env.HERDR_TAB_ID ?? "",
-    workspaceId: env.HERDR_WORKSPACE_ID ?? "",
-  };
+}
+
+function addTab(tabs: string[], tabId: string): string[] {
+  if (!tabId) {
+    return tabs;
+  }
+  if (tabs.includes(tabId)) {
+    return tabs;
+  }
+  return [...tabs, tabId];
+}
+
+function eventData(eventJson: unknown): Record<string, unknown> {
+  if (typeof eventJson !== "object" || eventJson === null || !("data" in eventJson)) {
+    return {};
+  }
+  const data = (eventJson as { data?: unknown }).data;
+  if (typeof data !== "object" || data === null) {
+    return {};
+  }
+  return data as Record<string, unknown>;
+}
+
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+export async function seedLivePaneTabs(deps: PaneTabsDeps): Promise<string[]> {
+  const response = await deps.rpc.call("pane.list", {});
+  const typeOutcome = interpretResponse(
+    response,
+    (rpc) => (rpc.result as { type?: unknown } | undefined)?.type,
+  );
+  if (typeOutcome.kind !== "ok" || typeOutcome.value !== "pane_list") {
+    const code = typeOutcome.kind === "fail" ? typeOutcome.code : "transport";
+    throw new Error(`pane.list failed: ${code}`);
+  }
+  const panes = paneListEntries(response);
+  if (panes === null) {
+    throw new Error("pane.list returned invalid pane data");
+  }
+  const notes = new Map<string, string>();
+  const tabIds = new Set<string>();
+  for (const { pane_id: paneId, tab_id: tabId } of panes) {
+    if (!paneId || !tabId) {
+      continue;
+    }
+    notes.set(paneId, tabId);
+    tabIds.add(tabId);
+  }
+  if (notes.size === 0) {
+    return [];
+  }
+  await deps.fs.mkdirp(paneNoteDir(deps));
+  await Promise.all([...notes].map(([paneId, tabId]) => writePaneNote(deps, paneId, tabId)));
+  return [...tabIds];
+}
+
+function paneListEntries(response: JsonRpcResponse): PaneListEntry[] | null {
+  const type = (response.result as { type?: unknown } | undefined)?.type;
+  if (type !== "pane_list") {
+    return null;
+  }
+  const panes = (response.result as { panes?: unknown }).panes;
+  if (!Array.isArray(panes)) {
+    return null;
+  }
+  const entries: PaneListEntry[] = [];
+  for (const pane of panes) {
+    if (typeof pane !== "object" || pane === null || Array.isArray(pane)) {
+      return null;
+    }
+    const { pane_id: paneId, tab_id: tabId } = pane as Record<string, unknown>;
+    if (typeof paneId !== "string" || typeof tabId !== "string") {
+      return null;
+    }
+    entries.push({ pane_id: paneId, tab_id: tabId });
+  }
+  return entries;
+}
+
+export async function paneTab(deps: PaneTabsDeps, paneId: string): Promise<string | null> {
+  const response = await deps.rpc.call("pane.get", { pane_id: paneId });
+  const outcome = interpretResponse(
+    response,
+    (rpc) => {
+      const pane = (rpc.result as { pane?: { tab_id?: unknown } } | undefined)?.pane;
+      const tabId = pane?.tab_id;
+      return typeof tabId === "string" && tabId ? tabId : undefined;
+    },
+    "pane_not_found",
+  );
+  return requireField(outcome, `pane.get ${paneId}`);
+}
+
+export async function notePaneTab(
+  deps: PaneTabsDeps,
+  paneId: string,
+  tabId: string,
+): Promise<void> {
+  if (!paneId || !tabId) {
+    return;
+  }
+  await deps.fs.mkdirp(paneNoteDir(deps));
+  await writePaneNote(deps, paneId, tabId);
+}
+
+export async function removePaneNote(deps: PaneTabsDeps, paneId: string): Promise<void> {
+  await deps.fs.rm(paneNotePath(deps, paneId));
+}
+
+export async function readPaneTab(deps: PaneTabsDeps, paneId: string): Promise<string | null> {
+  return deps.fs.readFile(paneNotePath(deps, paneId));
+}
+
+export async function workspaceActiveTab(
+  deps: PaneTabsDeps,
+  workspaceId: string,
+): Promise<string | null> {
+  const response = await deps.rpc.call("workspace.get", { workspace_id: workspaceId });
+  const outcome = interpretResponse(
+    response,
+    (rpc) => {
+      const tabId = (rpc.result as { workspace?: { active_tab_id?: unknown } } | undefined)
+        ?.workspace?.active_tab_id;
+      return typeof tabId === "string" && tabId ? tabId : undefined;
+    },
+    "workspace_not_found",
+  );
+  return requireField(outcome, "workspace.get");
+}
+
+async function writePaneNote(deps: PaneTabsDeps, paneId: string, tabId: string): Promise<void> {
+  const notePath = paneNotePath(deps, paneId);
+  const temporary = `${notePath}.${deps.pid}`;
+  await deps.fs.writeFile(temporary, tabId);
+  await deps.fs.rename(temporary, notePath);
+}
+
+function paneNotePath(deps: PaneTabsDeps, paneId: string): string {
+  return `${paneNoteDir(deps)}/${hexKey(paneId)}`;
+}
+
+function paneNoteDir(deps: PaneTabsDeps): string {
+  return `${deps.stateDir}/panes/${deps.socketKey}`;
 }

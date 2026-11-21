@@ -2,22 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { hexKey } from "./hex";
 import { createHost, createPluginLog, requiredEnv, runPlugin } from "./host";
 
-async function withEnv(
-  name: string,
-  value: string | undefined,
-  run: () => Promise<void> | void,
-): Promise<void> {
-  const previous = process.env[name];
-  if (value === undefined) delete process.env[name];
-  else process.env[name] = value;
-  try {
-    await run();
-  } finally {
-    if (previous === undefined) delete process.env[name];
-    else process.env[name] = previous;
-  }
-}
-
 describe("createPluginLog", () => {
   test("uses HERDR_PLUGIN_ID and does not double-prefix errors", async () => {
     const lines: unknown[][] = [];
@@ -145,3 +129,19 @@ describe("runPlugin", () => {
     expect(lines).toEqual([["host-test: boom"]]);
   });
 });
+
+async function withEnv(
+  name: string,
+  value: string | undefined,
+  run: () => Promise<void> | void,
+): Promise<void> {
+  const previous = process.env[name];
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+  try {
+    await run();
+  } finally {
+    if (previous === undefined) delete process.env[name];
+    else process.env[name] = previous;
+  }
+}

@@ -1,3 +1,10 @@
+const ESC = "\x1b";
+const CTRL_C = "\x03";
+const BACKSPACE = new Set(["\x7f", "\b"]);
+// CSI and SS3 sequences: arrows, function keys and the like.
+// oxlint-disable-next-line no-control-regex
+const SEQUENCE = /\x1b(?:\[[0-?]*[ -/]*[@-~]|O.)/g;
+
 export type Phase =
   | { kind: "typing"; typed: string }
   | { kind: "picked"; text: string }
@@ -6,13 +13,6 @@ export type Phase =
 export function typing(typed = ""): Phase {
   return { kind: "typing", typed };
 }
-
-const ESC = "\x1b";
-const CTRL_C = "\x03";
-const BACKSPACE = new Set(["\x7f", "\b"]);
-// CSI and SS3 sequences: arrows, function keys and the like.
-// oxlint-disable-next-line no-control-regex
-const SEQUENCE = /\x1b(?:\[[0-?]*[ -/]*[@-~]|O.)/g;
 
 export function press(
   hints: ReadonlyMap<string, string>,

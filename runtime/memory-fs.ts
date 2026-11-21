@@ -1,23 +1,5 @@
 import type { PluginFs } from "./fs";
 
-class MemoryError extends Error {
-  readonly code: string;
-
-  constructor(code: string) {
-    super(code);
-    this.code = code;
-    this.name = "MemoryError";
-  }
-}
-
-function normalize(path: string): string {
-  return path.replace(/\/+$/, "") || "/";
-}
-
-function parent(path: string): string {
-  return path.replace(/\/[^/]+$/, "") || "/";
-}
-
 export function memoryFs(): PluginFs {
   const dirs = new Set<string>(["/"]);
   const files = new Map<string, string>();
@@ -184,4 +166,22 @@ export function memoryFs(): PluginFs {
       files.set(file, data);
     },
   };
+}
+
+class MemoryError extends Error {
+  readonly code: string;
+
+  constructor(code: string) {
+    super(code);
+    this.code = code;
+    this.name = "MemoryError";
+  }
+}
+
+function normalize(path: string): string {
+  return path.replace(/\/+$/, "") || "/";
+}
+
+function parent(path: string): string {
+  return path.replace(/\/[^/]+$/, "") || "/";
 }

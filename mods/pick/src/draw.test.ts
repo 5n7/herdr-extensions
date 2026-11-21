@@ -3,19 +3,6 @@ import { draw, STYLE } from "./draw";
 import type { Piece, Screen } from "./layout";
 import { typing } from "./phase";
 
-const one = (row: number, column: number, text: string) => ({
-  token: { line: row, start: column, text },
-  pieces: [{ row, column, text }],
-});
-
-const screen = (
-  rows: string[],
-  tokens: Screen["tokens"],
-  hints: Record<string, string>,
-): Screen => ({ rows, tokens, hints: new Map(Object.entries(hints)) });
-
-const at = (row: number, column: number) => `\x1b[${row};${column}H`;
-
 describe("draw", () => {
   test("puts a hint on the token's first cell", () => {
     const shown = screen(["", "日本 https://a.test"], [one(1, 5, "https://a.test")], {
@@ -76,3 +63,18 @@ describe("draw", () => {
     expect(out).toContain(`${at(5, 1)}\x1b[2K${STYLE.note} no URL `);
   });
 });
+
+function one(row: number, column: number, text: string): Screen["tokens"][number] {
+  return {
+    token: { line: row, start: column, text },
+    pieces: [{ row, column, text }],
+  };
+}
+
+function screen(rows: string[], tokens: Screen["tokens"], hints: Record<string, string>): Screen {
+  return { rows, tokens, hints: new Map(Object.entries(hints)) };
+}
+
+function at(row: number, column: number): string {
+  return `\x1b[${row};${column}H`;
+}

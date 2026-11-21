@@ -1,27 +1,27 @@
 import { assignHints } from "./hints";
 import type { Token } from "./tokens";
 
+const graphemes = new Intl.Segmenter();
+
 /** Part of a token on one screen row. */
-export interface Piece {
+export type Piece = {
   row: number;
   column: number;
   text: string;
-}
+};
 
-export interface Screen {
+export type Screen = {
   rows: string[];
   /** The tokens with a piece on screen, each with its pieces in order. */
   tokens: { token: Token; pieces: Piece[] }[];
   hints: Map<string, string>;
-}
+};
 
-interface Span {
+type Span = {
   line: number;
   start: number;
   end: number;
-}
-
-const graphemes = new Intl.Segmenter();
+};
 
 // hc read gives a screen's bottom lines with each wrapped line joined back into
 // one. This lays them out as the terminal shows them: each line wrapped at the

@@ -1,5 +1,9 @@
 import { interpretResponse, type JsonRpcResponse } from "../../../runtime/rpc";
 
+export const RATIO_MIN = 0.1;
+export const RATIO_MAX = 0.9;
+export const RATIO_EPS = 0.002;
+
 export type LayoutDirection = "right" | "down";
 
 export type LayoutPane = { type: "pane" };
@@ -24,50 +28,24 @@ export type ExportOutcome =
   | { kind: "fail"; code: string }
   | { kind: "ok"; pending: PendingSplit[] };
 
-export const RATIO_MIN = 0.1;
-export const RATIO_MAX = 0.9;
-export const RATIO_EPS = 0.002;
-
 type AxisUnitCounts = Record<LayoutDirection, number>;
 
-export function clampRatio(value: number): number {
-  if (value < RATIO_MIN) {
-    return RATIO_MIN;
+export function interpretExport(response: JsonRpcResponse): ExportOutcome {
+  const outcome = interpretResponse(
+    response,
+    (rpc) => {
+      const root = (rpc.result as { layout?: { root?: unknown } } | undefined)?.layout?.root;
+      const node = parseLayoutNode(root);
+      return node ? pendingSplits(node) : undefined;
+    },
+    "layout_not_found",
+  );
+  if (outcome.kind === "missing") {
+    return { kind: "gone" };
   }
-  if (value > RATIO_MAX) {
-    return RATIO_MAX;
-  }
-  return value;
-}
-
-function countAxisUnits(
-  node: LayoutNode,
-  counts: WeakMap<LayoutNode, AxisUnitCounts>,
-): AxisUnitCounts {
-  const cached = counts.get(node);
-  if (cached) {
-    return cached;
-  }
-
-  if (node.type === "pane") {
-    const paneCounts = { down: 1, right: 1 };
-    counts.set(node, paneCounts);
-    return paneCounts;
-  }
-
-  const first = countAxisUnits(node.first, counts);
-  const second = countAxisUnits(node.second, counts);
-  const splitCounts = {
-    down: node.direction === "down" ? first.down + second.down : Math.max(first.down, second.down),
-    right:
-      node.direction === "right" ? first.right + second.right : Math.max(first.right, second.right),
-  };
-  counts.set(node, splitCounts);
-  return splitCounts;
-}
-
-export function axisUnits(node: LayoutNode, axis: LayoutDirection): number {
-  return countAxisUnits(node, new WeakMap())[axis];
+  return outcome.kind === "ok"
+    ? { kind: "ok", pending: outcome.value }
+    : { kind: "fail", code: outcome.code };
 }
 
 export function parseLayoutNode(value: unknown): LayoutNode | null {
@@ -100,6 +78,14 @@ export function parseLayoutNode(value: unknown): LayoutNode | null {
   return { type: "split", direction: node.direction, ratio: node.ratio, first, second };
 }
 
+export function pendingSplits(node: LayoutNode): PendingSplit[] {
+  const counts = new WeakMap<LayoutNode, AxisUnitCounts>();
+  countAxisUnits(node, counts);
+  const pending: PendingSplit[] = [];
+  collectPendingSplits(node, [], counts, pending);
+  return pending;
+}
+
 function collectPendingSplits(
   node: LayoutNode,
   path: boolean[],
@@ -126,28 +112,42 @@ function collectPendingSplits(
   path.pop();
 }
 
-export function pendingSplits(node: LayoutNode): PendingSplit[] {
-  const counts = new WeakMap<LayoutNode, AxisUnitCounts>();
-  countAxisUnits(node, counts);
-  const pending: PendingSplit[] = [];
-  collectPendingSplits(node, [], counts, pending);
-  return pending;
+export function clampRatio(value: number): number {
+  if (value < RATIO_MIN) {
+    return RATIO_MIN;
+  }
+  if (value > RATIO_MAX) {
+    return RATIO_MAX;
+  }
+  return value;
 }
 
-export function interpretExport(response: JsonRpcResponse): ExportOutcome {
-  const outcome = interpretResponse(
-    response,
-    (rpc) => {
-      const root = (rpc.result as { layout?: { root?: unknown } } | undefined)?.layout?.root;
-      const node = parseLayoutNode(root);
-      return node ? pendingSplits(node) : undefined;
-    },
-    "layout_not_found",
-  );
-  if (outcome.kind === "missing") {
-    return { kind: "gone" };
+export function axisUnits(node: LayoutNode, axis: LayoutDirection): number {
+  return countAxisUnits(node, new WeakMap())[axis];
+}
+
+function countAxisUnits(
+  node: LayoutNode,
+  counts: WeakMap<LayoutNode, AxisUnitCounts>,
+): AxisUnitCounts {
+  const cached = counts.get(node);
+  if (cached) {
+    return cached;
   }
-  return outcome.kind === "ok"
-    ? { kind: "ok", pending: outcome.value }
-    : { kind: "fail", code: outcome.code };
+
+  if (node.type === "pane") {
+    const paneCounts = { down: 1, right: 1 };
+    counts.set(node, paneCounts);
+    return paneCounts;
+  }
+
+  const first = countAxisUnits(node.first, counts);
+  const second = countAxisUnits(node.second, counts);
+  const splitCounts = {
+    down: node.direction === "down" ? first.down + second.down : Math.max(first.down, second.down),
+    right:
+      node.direction === "right" ? first.right + second.right : Math.max(first.right, second.right),
+  };
+  counts.set(node, splitCounts);
+  return splitCounts;
 }

@@ -2,6 +2,9 @@ import { hasErrorCode, isAlreadyExists, type PluginFs } from "./fs";
 import { hexKey } from "./hex";
 import type { Clock, ProcessTable } from "./process";
 
+const STALE_GRACE_ATTEMPTS = 10;
+const STALE_GRACE_MS = 50;
+
 export type CoalesceDeps = {
   clock: Clock;
   fs: PluginFs;
@@ -11,51 +14,54 @@ export type CoalesceDeps = {
   stateDir: string;
 };
 
-const STALE_GRACE_ATTEMPTS = 10;
-const STALE_GRACE_MS = 50;
+export async function coalesceTabWork(
+  deps: CoalesceDeps,
+  tabId: string,
+  worker: (tabId: string) => Promise<void>,
+): Promise<void> {
+  const owner = String(deps.process.pid);
+  const workDir = `${deps.stateDir}/work/${deps.socketKey}/${hexKey(tabId)}`;
+  const pendingDir = `${workDir}/pending`;
+  const lockDir = `${workDir}/lock`;
+  await deps.fs.mkdirp(pendingDir);
+  await deps.fs.writeFile(`${pendingDir}/${owner}`, "");
 
-async function ownerAlive(deps: CoalesceDeps, lockDir: string): Promise<boolean> {
-  const raw = await deps.fs.readFile(`${lockDir}/owner`);
-  if (raw === null) {
-    return false;
+  if (!(await acquireTabLock(deps, lockDir, owner))) {
+    return;
   }
-  const owner = raw.trim();
-  if (!owner || /[^0-9]/.test(owner)) {
-    return false;
-  }
-  return deps.process.alive(Number(owner));
-}
 
-async function writeOwner(deps: CoalesceDeps, lockDir: string, owner: string): Promise<void> {
-  await deps.fs.writeFile(`${lockDir}/owner`, `${owner}\n`);
-}
-
-async function createLock(deps: CoalesceDeps, lockDir: string, owner: string): Promise<boolean> {
+  let failed: Error | undefined;
   try {
-    await deps.fs.mkdir(lockDir);
-  } catch (error) {
-    if (isAlreadyExists(error)) {
-      return false;
-    }
-    throw error;
-  }
-  try {
-    await writeOwner(deps, lockDir, owner);
-    return true;
-  } catch (error) {
-    if (hasErrorCode(error, "ENOENT")) {
-      return false;
-    }
-    try {
-      await deps.fs.rm(`${lockDir}/owner`);
-      await deps.fs.rmdir(lockDir);
-    } catch (cleanupError) {
-      if (!hasErrorCode(cleanupError, "ENOENT") && !hasErrorCode(cleanupError, "ENOTEMPTY")) {
-        throw new AggregateError([error, cleanupError], `could not clean up tab lock ${lockDir}`);
+    while (true) {
+      await clearPending(deps, pendingDir);
+      try {
+        await worker(tabId);
+        failed = undefined;
+      } catch (error) {
+        failed = error instanceof Error ? error : new Error(String(error));
+      }
+      if (!(await releaseLock(deps, lockDir, owner))) {
+        throw new Error(`could not release tab lock ${lockDir}`);
+      }
+      if (!(await hasPending(deps, pendingDir))) {
+        break;
+      }
+      if (!(await acquireTabLock(deps, lockDir, owner))) {
+        break;
       }
     }
-    throw error;
+  } finally {
+    await releaseLock(deps, lockDir, owner).catch(() => undefined);
   }
+
+  if (failed) {
+    throw failed;
+  }
+}
+
+async function clearPending(deps: CoalesceDeps, pendingDir: string): Promise<void> {
+  const names = await deps.fs.readdir(pendingDir);
+  await Promise.all(names.map((name) => deps.fs.rm(`${pendingDir}/${name}`)));
 }
 
 async function releaseLock(
@@ -71,6 +77,10 @@ async function releaseLock(
   await deps.fs.rm(`${lockDir}/owner`);
   await deps.fs.rmdir(lockDir);
   return true;
+}
+
+async function hasPending(deps: CoalesceDeps, pendingDir: string): Promise<boolean> {
+  return (await deps.fs.readdir(pendingDir)).length > 0;
 }
 
 export async function acquireTabLock(
@@ -122,56 +132,46 @@ export async function acquireTabLock(
   return createLock(deps, lockDir, owner);
 }
 
-async function clearPending(deps: CoalesceDeps, pendingDir: string): Promise<void> {
-  const names = await deps.fs.readdir(pendingDir);
-  await Promise.all(names.map((name) => deps.fs.rm(`${pendingDir}/${name}`)));
-}
-
-async function hasPending(deps: CoalesceDeps, pendingDir: string): Promise<boolean> {
-  return (await deps.fs.readdir(pendingDir)).length > 0;
-}
-
-export async function coalesceTabWork(
-  deps: CoalesceDeps,
-  tabId: string,
-  worker: (tabId: string) => Promise<void>,
-): Promise<void> {
-  const owner = String(deps.process.pid);
-  const workDir = `${deps.stateDir}/work/${deps.socketKey}/${hexKey(tabId)}`;
-  const pendingDir = `${workDir}/pending`;
-  const lockDir = `${workDir}/lock`;
-  await deps.fs.mkdirp(pendingDir);
-  await deps.fs.writeFile(`${pendingDir}/${owner}`, "");
-
-  if (!(await acquireTabLock(deps, lockDir, owner))) {
-    return;
-  }
-
-  let failed: Error | undefined;
+async function createLock(deps: CoalesceDeps, lockDir: string, owner: string): Promise<boolean> {
   try {
-    while (true) {
-      await clearPending(deps, pendingDir);
-      try {
-        await worker(tabId);
-        failed = undefined;
-      } catch (error) {
-        failed = error instanceof Error ? error : new Error(String(error));
-      }
-      if (!(await releaseLock(deps, lockDir, owner))) {
-        throw new Error(`could not release tab lock ${lockDir}`);
-      }
-      if (!(await hasPending(deps, pendingDir))) {
-        break;
-      }
-      if (!(await acquireTabLock(deps, lockDir, owner))) {
-        break;
+    await deps.fs.mkdir(lockDir);
+  } catch (error) {
+    if (isAlreadyExists(error)) {
+      return false;
+    }
+    throw error;
+  }
+  try {
+    await writeOwner(deps, lockDir, owner);
+    return true;
+  } catch (error) {
+    if (hasErrorCode(error, "ENOENT")) {
+      return false;
+    }
+    try {
+      await deps.fs.rm(`${lockDir}/owner`);
+      await deps.fs.rmdir(lockDir);
+    } catch (cleanupError) {
+      if (!hasErrorCode(cleanupError, "ENOENT") && !hasErrorCode(cleanupError, "ENOTEMPTY")) {
+        throw new AggregateError([error, cleanupError], `could not clean up tab lock ${lockDir}`);
       }
     }
-  } finally {
-    await releaseLock(deps, lockDir, owner).catch(() => undefined);
+    throw error;
   }
+}
 
-  if (failed) {
-    throw failed;
+async function writeOwner(deps: CoalesceDeps, lockDir: string, owner: string): Promise<void> {
+  await deps.fs.writeFile(`${lockDir}/owner`, `${owner}\n`);
+}
+
+async function ownerAlive(deps: CoalesceDeps, lockDir: string): Promise<boolean> {
+  const raw = await deps.fs.readFile(`${lockDir}/owner`);
+  if (raw === null) {
+    return false;
   }
+  const owner = raw.trim();
+  if (!owner || /[^0-9]/.test(owner)) {
+    return false;
+  }
+  return deps.process.alive(Number(owner));
 }

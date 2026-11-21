@@ -1,12 +1,6 @@
 import type { Piece, Screen } from "./layout";
 import type { Phase } from "./phase";
 
-export interface Picture {
-  screen: Screen;
-  phase: Phase;
-  height: number;
-}
-
 const CSI = "\x1b[";
 
 // Autowrap off, so a hint wider than a token at the right edge is cut instead
@@ -20,6 +14,12 @@ export const STYLE = {
   hint: `${CSI}0;1;30;43m`,
   picked: `${CSI}0;1;30;42m`,
   note: `${CSI}0;7m`,
+};
+
+export type Picture = {
+  screen: Screen;
+  phase: Phase;
+  height: number;
 };
 
 export function draw({ screen, phase, height }: Picture): string {
@@ -52,4 +52,6 @@ function hintOver(pieces: readonly Piece[], hint: string, from: number): string[
   return out;
 }
 
-const at = (row: number, column: number) => `${CSI}${row + 1};${column + 1}H`;
+function at(row: number, column: number): string {
+  return `${CSI}${row + 1};${column + 1}H`;
+}

@@ -5,28 +5,28 @@ import { interpretExport, type PendingSplit } from "./layout";
 const MAX_EXPORT_FAILURES = 3;
 const MAX_APPLIES = 3;
 
-async function applyRatios(
+export function evenTab(deps: PaneTabsDeps, tabId: string): Promise<void> {
+  return createEvenInvocation(deps)(tabId);
+}
+
+export function createEvenInvocation(
   deps: PaneTabsDeps,
-  tabId: string,
-  pending: PendingSplit[],
-): Promise<void> {
-  for (const split of pending) {
-    const response = await deps.rpc.call("layout.set_split_ratio", {
-      tab_id: tabId,
-      path: split.path,
-      ratio: split.want,
-    });
-    const outcome = interpretResponse(
-      response,
-      (rpc) => (rpc.result as { type?: unknown } | undefined)?.type,
-    );
-    if (outcome.kind !== "ok" || outcome.value !== "layout_split_ratio_set") {
-      const code = outcome.kind === "ok" ? String(outcome.value) : outcome.code;
-      deps.log(
-        `${tabId}: set_split_ratio ${JSON.stringify(split.path)} ${split.want} failed: ${code}`,
-      );
+  panesSeeded = false,
+): (tabId: string) => Promise<void> {
+  let seedPromise: Promise<void> | undefined = panesSeeded ? Promise.resolve() : undefined;
+  const seedOnce = () => {
+    if (!seedPromise) {
+      const pending = seedLivePaneTabs(deps).then(() => undefined);
+      seedPromise = pending;
+      void pending.catch(() => {
+        if (seedPromise === pending) {
+          seedPromise = undefined;
+        }
+      });
     }
-  }
+    return seedPromise;
+  };
+  return (tabId) => runEvenTab(deps, tabId, seedOnce);
 }
 
 async function runEvenTab(
@@ -64,26 +64,26 @@ async function runEvenTab(
   }
 }
 
-export function createEvenInvocation(
+async function applyRatios(
   deps: PaneTabsDeps,
-  panesSeeded = false,
-): (tabId: string) => Promise<void> {
-  let seedPromise: Promise<void> | undefined = panesSeeded ? Promise.resolve() : undefined;
-  const seedOnce = () => {
-    if (!seedPromise) {
-      const pending = seedLivePaneTabs(deps).then(() => undefined);
-      seedPromise = pending;
-      void pending.catch(() => {
-        if (seedPromise === pending) {
-          seedPromise = undefined;
-        }
-      });
+  tabId: string,
+  pending: PendingSplit[],
+): Promise<void> {
+  for (const split of pending) {
+    const response = await deps.rpc.call("layout.set_split_ratio", {
+      tab_id: tabId,
+      path: split.path,
+      ratio: split.want,
+    });
+    const outcome = interpretResponse(
+      response,
+      (rpc) => (rpc.result as { type?: unknown } | undefined)?.type,
+    );
+    if (outcome.kind !== "ok" || outcome.value !== "layout_split_ratio_set") {
+      const code = outcome.kind === "ok" ? String(outcome.value) : outcome.code;
+      deps.log(
+        `${tabId}: set_split_ratio ${JSON.stringify(split.path)} ${split.want} failed: ${code}`,
+      );
     }
-    return seedPromise;
-  };
-  return (tabId) => runEvenTab(deps, tabId, seedOnce);
-}
-
-export function evenTab(deps: PaneTabsDeps, tabId: string): Promise<void> {
-  return createEvenInvocation(deps)(tabId);
+  }
 }

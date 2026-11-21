@@ -4,30 +4,6 @@ import { memoryFs } from "./memory-fs";
 import type { Clock, ProcessTable } from "./process";
 import { errno } from "./testing";
 
-function instantClock(): Clock {
-  return { sleep: async () => undefined };
-}
-
-function processTable(pid: number, live: Set<number>): ProcessTable {
-  return {
-    pid,
-    alive(id) {
-      return live.has(id);
-    },
-  };
-}
-
-function deps(pid: number, live: Set<number>, fs = memoryFs()): CoalesceDeps {
-  return {
-    clock: instantClock(),
-    fs,
-    log: () => undefined,
-    process: processTable(pid, live),
-    socketKey: "sock",
-    stateDir: "/state",
-  };
-}
-
 describe("acquireTabLock", () => {
   test("recovers a lock whose owner is dead", async () => {
     const fs = memoryFs();
@@ -131,3 +107,27 @@ describe("coalesceTabWork", () => {
     ).rejects.toBe(failure);
   });
 });
+
+function deps(pid: number, live: Set<number>, fs = memoryFs()): CoalesceDeps {
+  return {
+    clock: instantClock(),
+    fs,
+    log: () => undefined,
+    process: processTable(pid, live),
+    socketKey: "sock",
+    stateDir: "/state",
+  };
+}
+
+function instantClock(): Clock {
+  return { sleep: async () => undefined };
+}
+
+function processTable(pid: number, live: Set<number>): ProcessTable {
+  return {
+    pid,
+    alive(id) {
+      return live.has(id);
+    },
+  };
+}

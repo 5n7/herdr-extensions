@@ -10,12 +10,6 @@ const IDLE_MS = 60_000;
 
 const OPENER = process.platform === "darwin" ? "/usr/bin/open" : "xdg-open";
 
-interface Mode {
-  find: (lines: readonly string[]) => Token[];
-  nothing: string;
-  take: (text: string) => unknown;
-}
-
 const MODES: Record<string, Mode> = {
   copy: {
     find: findTokens,
@@ -27,6 +21,12 @@ const MODES: Record<string, Mode> = {
     nothing: "no URL on screen",
     take: (text) => Bun.spawn([OPENER, text], { stdio: ["ignore", "ignore", "ignore"] }).exited,
   },
+};
+
+type Mode = {
+  find: (lines: readonly string[]) => Token[];
+  nothing: string;
+  take: (text: string) => unknown;
 };
 
 class Picker {

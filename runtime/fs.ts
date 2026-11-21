@@ -70,6 +70,14 @@ export const nodeFs: PluginFs = {
   },
 };
 
+export function isNotFound(error: unknown): boolean {
+  return hasErrorCode(error, "ENOENT");
+}
+
+export function isAlreadyExists(error: unknown): boolean {
+  return hasErrorCode(error, "EEXIST");
+}
+
 export function hasErrorCode(error: unknown, code: string): boolean {
   return (
     typeof error === "object" &&
@@ -77,12 +85,4 @@ export function hasErrorCode(error: unknown, code: string): boolean {
     "code" in error &&
     (error as { code: unknown }).code === code
   );
-}
-
-export function isAlreadyExists(error: unknown): boolean {
-  return hasErrorCode(error, "EEXIST");
-}
-
-export function isNotFound(error: unknown): boolean {
-  return hasErrorCode(error, "ENOENT");
 }

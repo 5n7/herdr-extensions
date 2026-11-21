@@ -11,19 +11,6 @@ import {
   RATIO_MIN,
 } from "./layout";
 
-function pane(): LayoutNode {
-  return { type: "pane" };
-}
-
-function split(
-  direction: LayoutDirection,
-  ratio: number,
-  first: LayoutNode,
-  second: LayoutNode,
-): LayoutNode {
-  return { type: "split", direction, ratio, first, second };
-}
-
 describe("clampRatio", () => {
   test("keeps interior values", () => {
     expect(clampRatio(0.5)).toBe(0.5);
@@ -104,6 +91,9 @@ describe("interpretExport", () => {
       expect(outcome.pending).toEqual([{ path: [], want: 0.5 }]);
     }
   });
+});
+
+describe("parseLayoutNode", () => {
   test("rejects an unparseable root", () => {
     expect(parseLayoutNode({ type: "split" })).toBeNull();
   });
@@ -121,3 +111,16 @@ describe("interpretExport", () => {
     }
   });
 });
+
+function pane(): LayoutNode {
+  return { type: "pane" };
+}
+
+function split(
+  direction: LayoutDirection,
+  ratio: number,
+  first: LayoutNode,
+  second: LayoutNode,
+): LayoutNode {
+  return { type: "split", direction, ratio, first, second };
+}

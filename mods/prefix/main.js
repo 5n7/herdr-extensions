@@ -45,56 +45,6 @@ const MARK = {
 
 const GLYPHS = { tab: "⇥", "shift-tab": "⇧⇥", space: "␣" };
 
-// Where the prefix acts: the focused space and tab, and the terminal that gets
-// keys, which is the one terminal.show put in the pane's place if any.
-function here() {
-  const f = focused();
-  const space = spaces().find((s) => s.id === f?.space);
-  const address = f?.shown ?? f?.terminal ?? null;
-  const terminal = terminals().find((x) => x.address === address);
-  return {
-    space,
-    tab: space?.tabs.find((x) => x.id === f?.tab),
-    address,
-    terminal,
-    // terminals()' cwd is where a terminal started; this one is where it is now.
-    cwd: f?.cwd ?? null,
-  };
-}
-
-// A command as keys.json writes it: "name", or "name:value" with the value in
-// its first argument.
-function runCommand(command) {
-  const at = command.indexOf(":");
-  if (at < 0) return run(command);
-  const name = command.slice(0, at);
-  const value = command.slice(at + 1);
-  const arg = commands().find((c) => c.name === name)?.args[0]?.name;
-  // An unknown command goes as written, for the app to name in its error.
-  if (!arg) return run(command);
-  run(name, { [arg]: /^\d+$/.test(value) ? Number(value) : value });
-}
-
-const prefixBinding = (keystroke) =>
-  keys().find((k) => k.section === "mod:prefix" && k.keys === keystroke);
-
-// Runs hc and shows a failure under `title`, which would otherwise go unseen.
-async function hcOrNotify(title, args) {
-  try {
-    await hcOk(args);
-  } catch (err) {
-    notifyError(title, err);
-  }
-}
-
-function openPick(mode) {
-  openOverlay({ mod: "pick", props: { mode }, kind: "window", frame: "none" });
-}
-
-// The agents that came to need you, blocked or finished while you weren't
-// looking.
-const waiting = () => agents().filter((a) => a.status === "blocked" || a.status === "done");
-
 // This mod's own commands, run once the prefix has closed.
 const ACTIONS = {
   // The TUI's open_notification_target: the agent that came to need you last.
@@ -141,20 +91,6 @@ const ACTIONS = {
 // binds both keys there as actions.
 const KEY_CONTEXT = "Prefix";
 const TAB_ACTIONS = { tab: "prefix_tab", "shift-tab": "prefix_shift_tab" };
-
-let tabKeysBound = false;
-
-function bindTabKeysOnce(cx) {
-  if (tabKeysBound) return;
-  cx.bind_keys(
-    Object.entries(TAB_ACTIONS).map(([keystroke, action]) => ({
-      keystroke,
-      action,
-      context: KEY_CONTEXT,
-    })),
-  );
-  tabKeysBound = true;
-}
 
 export default class Prefix extends View {
   init(_props, cx) {
@@ -304,6 +240,73 @@ export default class Prefix extends View {
           .children(this.groups.map((group) => column(look, group, state))),
       );
   }
+}
+
+// Where the prefix acts: the focused space and tab, and the terminal that gets
+// keys, which is the one terminal.show put in the pane's place if any.
+function here() {
+  const f = focused();
+  const space = spaces().find((s) => s.id === f?.space);
+  const address = f?.shown ?? f?.terminal ?? null;
+  const terminal = terminals().find((x) => x.address === address);
+  return {
+    space,
+    tab: space?.tabs.find((x) => x.id === f?.tab),
+    address,
+    terminal,
+    // terminals()' cwd is where a terminal started; this one is where it is now.
+    cwd: f?.cwd ?? null,
+  };
+}
+
+// A command as keys.json writes it: "name", or "name:value" with the value in
+// its first argument.
+function runCommand(command) {
+  const at = command.indexOf(":");
+  if (at < 0) return run(command);
+  const name = command.slice(0, at);
+  const value = command.slice(at + 1);
+  const arg = commands().find((c) => c.name === name)?.args[0]?.name;
+  // An unknown command goes as written, for the app to name in its error.
+  if (!arg) return run(command);
+  run(name, { [arg]: /^\d+$/.test(value) ? Number(value) : value });
+}
+
+function prefixBinding(keystroke) {
+  return keys().find((k) => k.section === "mod:prefix" && k.keys === keystroke);
+}
+
+// Runs hc and shows a failure under `title`, which would otherwise go unseen.
+async function hcOrNotify(title, args) {
+  try {
+    await hcOk(args);
+  } catch (err) {
+    notifyError(title, err);
+  }
+}
+
+function openPick(mode) {
+  openOverlay({ mod: "pick", props: { mode }, kind: "window", frame: "none" });
+}
+
+// The agents that came to need you, blocked or finished while you weren't
+// looking.
+function waiting() {
+  return agents().filter((a) => a.status === "blocked" || a.status === "done");
+}
+
+let tabKeysBound = false;
+
+function bindTabKeysOnce(cx) {
+  if (tabKeysBound) return;
+  cx.bind_keys(
+    Object.entries(TAB_ACTIONS).map(([keystroke, action]) => ({
+      keystroke,
+      action,
+      context: KEY_CONTEXT,
+    })),
+  );
+  tabKeysBound = true;
 }
 
 // The waiting prefix: a state rather than a key to press, so no keycap.
