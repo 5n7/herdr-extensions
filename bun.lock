@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "herdr-plugins",
+      "name": "herdr-extensions",
       "devDependencies": {
         "oxfmt": "^0.68.0",
         "oxlint": "^1.83.0",

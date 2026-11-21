@@ -1,51 +1,39 @@
-# herdr-plugins
+# herdr-extensions
 
-Herdr plugins. `herdr-even-layout` equalizes pane widths and heights after splits.
+Extensions for [Herdr](https://herdr.dev), packaged as a Nix flake. It holds Herdr plugins, for the herdr TUI and server.
 
-## Start here
-
-Run these commands once in a fresh checkout:
-
-```sh
-mise install
-bun install --frozen-lockfile
-```
-
-mise installs the pinned Bun, shfmt, and ShellCheck executables. Bun installs the project's development dependencies.
-
-```sh
-bun run check
-```
-
-`bun run check` formats and lints the repository, checks types, and runs tests. It also builds a bundle and a standalone binary for every plugin, then verifies that each binary fails when `HERDR_SOCKET_PATH` is unset.
+| Package              | Kind                       | What it does                                                     |
+| -------------------- | -------------------------- | ---------------------------------------------------------------- |
+| `plugin-even-layout` | plugin `herdr-even-layout` | Equalizes pane widths and heights after splits, moves and closes |
 
 ## Layout
 
 ```text
-runtime/                 shared JSON-RPC, pane notes, coalescing, plugin host
-plugins/<name>/           herdr-plugin.toml, ./plugin, TypeScript sources
+flake.nix                 packages.<system>.*, found from plugins/
+nix/                      buildPlugin, buildBunExecutable
+runtime/                  TypeScript shared by plugins: JSON-RPC, pane notes, coalescing
+plugins/<name>/           herdr-plugin.toml, src/, default.nix
 ```
 
-`./plugin` in a plugin directory is the Herdr command. A source checkout runs it with Bun.
+## Using the packages
 
-## Link a local source tree
+Every package builds to a folder that is installed as is.
+
+- A plugin is a folder for `herdr plugin link`. `passthru.pluginId` is its id.
+
+## Development
 
 ```sh
-herdr plugin link ./plugins/even-layout --enabled
+mise install
+bun install --frozen-lockfile
+bun run check   # format, lint, typecheck, test
+nix flake check # build every package; each executable's build runs its tests and a smoke test
 ```
 
-## Build outputs
+To try a plugin from a checkout, run `herdr plugin link "$(nix build --print-out-paths .#plugin-even-layout)"`.
 
-- `bun run build` writes `dist/<name>/plugin.js` for every plugin.
-- `bun run build:standalone` writes `dist/<name>/plugin` for every plugin on the current host.
+## Adding one
 
-## Add a plugin
+A folder with a `default.nix` becomes a package; nothing else lists it.
 
-1. Create `plugins/<name>/` with `herdr-plugin.toml`, a `./plugin` launcher, and `src/main.ts`. Copy `./plugin` from an existing plugin.
-2. Start `src/main.ts` with `createPluginLog`, `requiredEnv`, `createHost`, and `runPlugin` from `runtime/`. Use the runtime for socket RPC, pane notes, and coalescing. Keep event routing and plugin behavior in the plugin.
-3. Build, signing, smoke tests, shfmt, and ShellCheck discover `plugins/*/herdr-plugin.toml`. Do not add the plugin id to `package.json`.
-4. Keep unit tests next to the modules they cover.
-
-## Versioning
-
-Bump `version` in that plugin's `herdr-plugin.toml`. After publishing the repository to GitHub, consumers can use `github:5n7/herdr-plugins` instead of a local path. Tag a standalone plugin release as `<plugin-id>-v<version>`.
+- **A plugin:** `plugins/<name>/` with `herdr-plugin.toml` (its commands run `./plugin`), `src/main.ts`, and a `default.nix` of `{ buildPlugin }: buildPlugin ./.`.

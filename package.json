@@ -1,16 +1,12 @@
 {
-  "name": "herdr-plugins",
+  "name": "herdr-extensions",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bash scripts/build-plugins.sh",
-    "build:standalone": "bash scripts/build-plugins.sh --compile && bash scripts/sign-standalone.sh",
-    "check": "bun run format:check && bun run lint && bun run typecheck && bun run test && bun run build && bun run build:standalone && bun run smoke:standalone",
-    "format": "oxfmt --write . && bash scripts/sh-plugins.sh format",
-    "format:check": "oxfmt --check . && bash scripts/sh-plugins.sh format:check",
-    "lint": "oxlint --deny-warnings . && bash scripts/sh-plugins.sh lint",
-    "smoke:standalone": "./scripts/smoke-standalone.sh",
-    "test": "bun test",
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun test",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint --deny-warnings .",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

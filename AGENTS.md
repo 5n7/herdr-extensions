@@ -1,10 +1,8 @@
 # Agent notes
 
+The consumer is the owner's nix-darwin dotfiles, which take `packages.<system>.*` from this flake. Nothing here is installed by `herdr plugin install` or copied by hand.
+
 ## Setup
-
-Use mise to install Bun, shfmt, and ShellCheck. Do not define mise tasks. Package scripts use `mise exec` only to select the managed shell tools.
-
-In a fresh checkout, run:
 
 ```sh
 mise install
@@ -13,8 +11,13 @@ bun install --frozen-lockfile
 
 ## Before completion
 
-Run `bun run check`. It formats and lints the repository, checks types, runs tests, builds one bundle and one standalone binary per plugin, and verifies that each standalone binary fails when `HERDR_SOCKET_PATH` is unset. New plugins are discovered from `plugins/*/herdr-plugin.toml`.
+- Run `bun run check`: oxfmt, oxlint, tsc (TypeScript 7) and `bun test`.
+- Run `nix flake check`. It builds every package. Each compiled executable's build runs `bun test` on its sources, then a smoke test runs the executable once.
+- New files must be added to Git before Nix can see them.
 
-TypeScript plugins talk to Herdr through `runtime/`. Keep layout math and event routing free of sockets and the filesystem so `bun test` stays deterministic.
+## Plugins
 
-Keep generated files out of Git. `dist/` holds local release binaries.
+- `plugins/<name>/` holds `herdr-plugin.toml`, `src/main.ts` and a `default.nix` of `buildPlugin ./.`. `flake.nix` finds it and exposes `plugin-<name>`.
+- Plugins talk to Herdr through `runtime/`.
+- Keep layout math and event routing free of sockets and the filesystem, so tests stay deterministic.
+- `herdr-plugin.toml` is the source of a plugin's id and version. Bump `version` there.
