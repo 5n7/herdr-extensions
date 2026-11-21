@@ -1,4 +1,4 @@
-# herdr-extensions
+# Herdr Extensions
 
 Extensions for [Herdr](https://herdr.dev), packaged as a Nix flake:
 
