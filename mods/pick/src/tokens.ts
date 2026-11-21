@@ -1,4 +1,4 @@
-const LINE_COLUMN = String.raw`(?::\d+(?::\d+)?)`;
+export const LINE_COLUMN = String.raw`(?::\d+(?::\d+)?)`;
 const OCTET = String.raw`(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)`;
 const PATH_CHAR = String.raw`[\w.\-@+%~]`;
 const PORT = String.raw`(?::\d{1,5})`;
@@ -10,6 +10,14 @@ const COMMIT: Kind = { re: /\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b/
 const DIFF_PATH: Kind = { re: /(?:^|\s)(?:---|\+\+\+) [ab]\/(?<token>\S+)/dg };
 const IPV4: Kind = {
   re: new RegExp(String.raw`\b(?:${OCTET}\.){3}${OCTET}${PORT}?\b`, "dg"),
+};
+// A file name with an extension, bare or on a path. It can end at a sentence's
+// period, but not before another extension.
+const FILE: Kind = {
+  re: new RegExp(
+    String.raw`(?<!${PATH_CHAR})(?:${PATH_CHAR}*\/)*${PATH_CHAR}*\.[A-Za-z]\w*(?![\w\-@+%~/]|\.\w)${LINE_COLUMN}?`,
+    "dg",
+  ),
 };
 const NUMBER: Kind = { re: /\b\d{4,}\b/dg };
 const PATH: Kind = {
@@ -30,7 +38,7 @@ const UUID: Kind = { re: /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
 
 const KINDS = [COMMIT, DIFF_PATH, IPV4, NUMBER, PATH, URL, UUID];
 
-const OPENABLE = /^https?:\/\//i;
+const WEB_URL = /^https?:\/\//i;
 
 const OPENING: Record<string, string> = { ")": "(", "]": "[" };
 const DOT_SEGMENT = /(?:^|\/)\.\.$/;
@@ -53,8 +61,14 @@ export function findTokens(lines: readonly string[]): Token[] {
   return resolveOverlaps(candidates(lines, KINDS));
 }
 
-export function findUrls(lines: readonly string[]): Token[] {
-  return resolveOverlaps(candidates(lines, [URL]).filter((c) => OPENABLE.test(c.text)));
+// URLs and the files a program names, a diff's included. What opens is the
+// caller's to say: a URL that isn't a browser's names no file here either.
+export function findOpenable(lines: readonly string[]): Token[] {
+  return resolveOverlaps(candidates(lines, [DIFF_PATH, FILE, URL]));
+}
+
+export function isWebUrl(text: string): boolean {
+  return WEB_URL.test(text);
 }
 
 function candidates(lines: readonly string[], kinds: readonly Kind[]): Candidate[] {

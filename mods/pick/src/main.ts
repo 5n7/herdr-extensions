@@ -1,7 +1,10 @@
+import { homedir } from "node:os";
+import { dirname } from "node:path";
 import { draw, ENTER, LEAVE } from "./draw";
+import { existingFile, searchFolders } from "./files";
 import { layOut, type Screen } from "./layout";
 import { type Phase, press, typing } from "./phase";
-import { findTokens, findUrls, type Token } from "./tokens";
+import { findOpenable, findTokens, isWebUrl, type Token } from "./tokens";
 
 const PICKED_MS = 150;
 const NOTE_MS = 1200;
@@ -10,20 +13,20 @@ const FAILED_MS = 4000;
 const IDLE_MS = 60_000;
 
 const OPENER = process.platform === "darwin" ? "/usr/bin/open" : "xdg-open";
+// Neovim, read-only, shows a Markdown file in a terminal on the right; the
+// files it shows.
+const VIEWER = ["nvim", "-R"];
+const VIEWABLE = /\.(?:md|markdown)$/i;
 
-const MODES: Record<string, Mode> = {
-  copy: {
+const MODES: Record<string, (cwd: string) => Mode> = {
+  copy: () => ({
     find: findTokens,
     nothing: "nothing to copy on screen",
     take: async (text) => {
       process.stdout.write(`\x1b]52;c;${Buffer.from(text).toString("base64")}\x07`);
     },
-  },
-  open: {
-    find: findUrls,
-    nothing: "no URL on screen",
-    take: openUrl,
-  },
+  }),
+  open: openMode,
 };
 
 type Mode = {
@@ -111,22 +114,72 @@ class Picker {
   }
 }
 
-const [name, screen] = process.argv.slice(2);
+const [name, screen, cwd] = process.argv.slice(2);
 if (
   name === undefined ||
   !Object.hasOwn(MODES, name) ||
   screen === undefined ||
   !process.stdin.isTTY
 ) {
-  console.error("usage: pick copy|open <screen>, on a terminal");
+  console.error("usage: pick copy|open <screen> [<cwd>], on a terminal");
   process.exit(64);
 }
-new Picker(MODES[name], screen.split("\n")).start();
+new Picker(MODES[name](cwd ?? ""), screen.split("\n")).start();
+
+// URLs go to the browser, and files to the viewer, in a terminal to the right
+// of the pane the picker shows in. Files are looked up from the working
+// directory of the program on screen, "" when that runs on another machine,
+// and from its repository's root, where git prints paths from.
+function openMode(cwd: string): Mode {
+  const home = homedir();
+  let folders: string[] | undefined;
+  const files = new Map<string, string | null>();
+  const viewable = (text: string) => {
+    if (!cwd) return null;
+    if (!files.has(text)) {
+      folders ??= searchFolders(cwd);
+      const file = existingFile(text, folders, home);
+      files.set(text, file !== null && VIEWABLE.test(file) ? file : null);
+    }
+    return files.get(text) ?? null;
+  };
+  return {
+    find: (lines) =>
+      findOpenable(lines).filter((t) => isWebUrl(t.text) || viewable(t.text) !== null),
+    nothing: "nothing to open on screen",
+    take: (text) => {
+      const file = files.get(text);
+      if (!file) return openUrl(text);
+      return herdrApp([
+        "do",
+        "terminal.open",
+        JSON.stringify({ argv: [...VIEWER, file], folder: dirname(file), place: "right" }),
+      ]);
+    },
+  };
+}
 
 // The output stays unread: a browser the opener starts can hold its pipes open.
 async function openUrl(url: string): Promise<void> {
   const code = await Bun.spawn([OPENER, url], { stdio: ["ignore", "ignore", "ignore"] }).exited;
   if (code !== 0) throw new Error(`${OPENER} exited with ${code}`);
+}
+
+// herdr-app reports a failure on stdout, as {"error": "..."}. The app keeps
+// its link in ~/.local/bin up to date.
+async function herdrApp(args: string[]): Promise<void> {
+  const cli = Bun.which("herdr-app") ?? `${homedir()}/.local/bin/herdr-app`;
+  const child = Bun.spawn([cli, ...args], { stdio: ["ignore", "pipe", "ignore"] });
+  const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+  if (code !== 0) throw new Error(errorOf(stdout) ?? `herdr-app exited with ${code}`);
+}
+
+function errorOf(stdout: string): string | null {
+  try {
+    return JSON.parse(stdout).error || null;
+  } catch {
+    return null;
+  }
 }
 
 // For the picker's bottom row, where a line break or a control character

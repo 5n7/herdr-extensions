@@ -18,7 +18,7 @@ export default class Pick extends View {
       try {
         await showPicker(mode, cx);
       } catch (err) {
-        const title = mode === "open" ? "Couldn't open a URL" : "Couldn't copy";
+        const title = mode === "open" ? "Couldn't open" : "Couldn't copy";
         notifyError(title, err);
       }
       const overlay = props()?.overlay;
@@ -46,8 +46,9 @@ async function showPicker(mode, cx) {
   const address = over ? f.terminal : (f.shown ?? f.terminal);
   if (!address) return;
   const { text } = JSON.parse(await hcOk(["read", "--json", address]));
+  const cwd = localCwd(address);
   const { address: picker } = JSON.parse(
-    await hcOk(["run", "--bg", "--json", "--no-parent", "--rm", "--", path, mode, text]),
+    await hcOk(["run", "--bg", "--json", "--no-parent", "--rm", "--", path, mode, text, cwd]),
   );
   // terminal.show takes a terminal only once the app has listed it, and before
   // that goes back to the pane's own.
@@ -70,4 +71,12 @@ async function until(cx, done, failure) {
 
 function listed(address) {
   return terminals().some((x) => x.address === address);
+}
+
+// Where the program on screen runs, for the picker to find the files it names.
+// None for a terminal on another machine, whose address has a machine/ in it.
+function localCwd(address) {
+  if (address.includes("/")) return "";
+  const t = terminals().find((x) => x.address === address);
+  return t?.foreground?.cwd ?? t?.cwd ?? "";
 }

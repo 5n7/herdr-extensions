@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { findTokens, findUrls } from "./tokens";
+import { findOpenable, findTokens, isWebUrl } from "./tokens";
 
 describe("findTokens", () => {
   test("ends URLs at Japanese punctuation and the text after them", () => {
@@ -83,11 +83,68 @@ describe("findTokens", () => {
   });
 });
 
-describe("findUrls", () => {
-  test("keeps only what a browser opens", () => {
+describe("findOpenable", () => {
+  test("finds URLs and files with an extension, bare, relative, absolute and under home", () => {
     expect(
-      texts(["https://a.test git@github.com:o/r.git file:///tmp/x 4ea006d"], findUrls),
-    ).toEqual(["https://a.test"]);
+      texts(
+        ["https://a.test README.md, ./docs/a.markdown ../x/main.rs /tmp/b.md ~/.zshrc ~/c.md."],
+        findOpenable,
+      ),
+    ).toEqual([
+      "https://a.test",
+      "README.md",
+      "./docs/a.markdown",
+      "../x/main.rs",
+      "/tmp/b.md",
+      "~/.zshrc",
+      "~/c.md",
+    ]);
+  });
+
+  test("leaves out words, numbers, versions and folders", () => {
+    expect(texts(["see 1.5 v1.2 12345 src/ docs/api"], findOpenable)).toEqual([]);
+  });
+
+  test("keeps an editor's line and column on a file", () => {
+    expect(texts(["at docs/a.md:12:5 and b.ts:3"], findOpenable)).toEqual([
+      "docs/a.md:12:5",
+      "b.ts:3",
+    ]);
+  });
+
+  test("takes a file's whole name, extensions and all", () => {
+    expect(texts(["a.mdx b.md.bak c.md/d.ts"], findOpenable)).toEqual([
+      "a.mdx",
+      "b.md.bak",
+      "c.md/d.ts",
+    ]);
+  });
+
+  test("takes a diff's file without its a/ or b/", () => {
+    expect(texts(["--- a/docs/a.md", "+++ b/src/x.ts"], findOpenable)).toEqual([
+      "docs/a.md",
+      "src/x.ts",
+    ]);
+  });
+
+  test("takes a URL whole, not the file at its end", () => {
+    expect(
+      texts(["https://github.com/o/r/blob/main/README.md ssh://host/x.md"], findOpenable),
+    ).toEqual(["https://github.com/o/r/blob/main/README.md", "ssh://host/x.md"]);
+  });
+
+  test("ends a file at brackets and quotes", () => {
+    expect(texts(["[a](docs/a.md) `b.md` 'c.md'"], findOpenable)).toEqual([
+      "docs/a.md",
+      "b.md",
+      "c.md",
+    ]);
+  });
+});
+
+describe("isWebUrl", () => {
+  test("tells a browser's URL from a path", () => {
+    expect([isWebUrl("HTTPS://a.test"), isWebUrl("docs/a.md")]).toEqual([true, false]);
   });
 });
 
