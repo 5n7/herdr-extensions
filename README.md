@@ -10,6 +10,7 @@ Extensions for [Herdr](https://herdr.dev), packaged as a Nix flake:
 | `plugin-even-layout` | plugin `herdr-even-layout` | Equalizes pane widths and heights after splits, moves and closes            |
 | `mod-pick`           | mod `pick`                 | Hint-based picker over the focused terminal: copy a token, or open a URL    |
 | `mod-prefix`         | mod `prefix`               | A tmux-style Ctrl+F prefix with a cheat-sheet card; its y and u open `pick` |
+| `mod-usage`          | mod `usage`                | Claude Code's rate limits in a sidebar block, with when each resets         |
 
 ## Layout
 
