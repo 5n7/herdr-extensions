@@ -7,12 +7,11 @@ import { h_flex, v_flex } from "gpui-base";
 import { checking, exec, home, knownAgents, layout, props, run, settings, theme } from "herdr";
 import { createClaude } from "./claude.js";
 import { ago, clock, compactUntil, hiddenAlert, longUntil, onLine, shown, tone } from "./limits.js";
+import { RAIL_PX, alertDot, findNode, sidebarPx } from "./sidebar.js";
 
 const POLL_MS = 5 * 60_000;
 const ACCOUNTS_KEY = "usage.accounts";
 const OPEN_KEY = "usage.open";
-// The app's sidebar mods draw a rail below this width.
-const RAIL_PX = 160;
 const COUNTDOWN_MIN_PX = 240;
 
 export default class Usage extends View {
@@ -70,22 +69,22 @@ export default class Usage extends View {
 
   fit() {
     const id = props()?.block ?? "usage";
-    const block = find(layout(), id);
+    const block = findNode(layout(), id);
     const px = this.contentPx;
     if (!block || px <= 0 || block.size?.px === px) return;
     run("layout.resize", { id, px });
   }
 
   render() {
-    const sidebarPx = find(layout(), "sidebar")?.size?.px ?? Infinity;
+    const sidebar = sidebarPx();
     const look = {
-      compact: sidebarPx < COUNTDOWN_MIN_PX,
+      compact: sidebar < COUNTDOWN_MIN_PX,
       now: Date.now(),
       programs: this.programs,
       t: theme(),
     };
     const { t } = look;
-    const rail = sidebarPx < RAIL_PX;
+    const rail = sidebar < RAIL_PX;
     const order = this.providers.map((p) => p.key);
     const accounts = shown(this.accounts, order, look.now);
     return v_flex()
@@ -266,19 +265,7 @@ function accountIcon(account, look) {
           : image(program.icon).w(14).h(14),
       ),
     )
-    .when(hiddenAlert(account.limits), (el) =>
-      el.child(
-        div()
-          .absolute()
-          .top(-2)
-          .right(-2)
-          .size(6)
-          .rounded(3)
-          .bg(t.ansi1)
-          .border(1)
-          .border_color(t.chrome),
-      ),
-    );
+    .when(hiddenAlert(account.limits), (el) => el.child(alertDot(t.ansi1, t)));
 }
 
 function resetText(l, now) {
@@ -289,15 +276,6 @@ function resetText(l, now) {
 
 function elementId(account) {
   return `usage-${account.id.replace(/[^A-Za-z0-9]/g, (c) => `_${c.charCodeAt(0).toString(16)}`)}`;
-}
-
-function find(node, id) {
-  if (node?.id === id) return node;
-  for (const child of node?.children ?? []) {
-    const found = find(child, id);
-    if (found) return found;
-  }
-  return null;
 }
 
 function load(key, fallback) {
